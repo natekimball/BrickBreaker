@@ -2,7 +2,7 @@ import pygame
 import sys
 import random
 import numpy as np
-# from DQNagent import Agent
+from DQNagent import Agent
 
 
 WIDTH, HEIGHT = 800, 600
@@ -43,12 +43,10 @@ def launch_game(agent):
         if actions[1] == 1 and paddle.right < WIDTH:
             paddle.right += 5
 
-        # Ball movement
         ball.left += ball_dx
         ball.top += ball_dy
 
         reward = 0
-        # Collisions
         ball_center = ball.left + ball.width // 2
         if ball.left < 0 or ball.right > WIDTH:
             ball_dx *= -1
@@ -85,7 +83,6 @@ def launch_game(agent):
         if not bricks:
             _, bricks, ball, ball_dx, ball_dy = initialize()
         
-        # Game over
         if ball.bottom > HEIGHT:
             pygame.quit()
             agent.loss(state, actions)
@@ -94,7 +91,6 @@ def launch_game(agent):
         
         agent.update(state, actions, reward)
         
-        # Draw everything
         redraw_window(win,state)
 
 def initialize():
