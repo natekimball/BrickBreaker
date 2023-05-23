@@ -85,11 +85,13 @@ def launch_game(agent):
         
         if ball.bottom > HEIGHT:
             pygame.quit()
-            agent.loss(state, actions)
+            agent.lost(state, actions)
             return score
             # sys.exit()
+            
+        new_state = (paddle, bricks, ball, ball_dx, ball_dy)
         
-        agent.update(state, actions, reward)
+        agent.update(state, actions, reward, new_state)
         
         redraw_window(win,state)
 
