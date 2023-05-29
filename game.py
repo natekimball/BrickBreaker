@@ -83,21 +83,21 @@ def launch_game(agent):
                     reward += 1
                     bricks.remove((brick,c))
                     break
-        if np.isclose(ball_dy, 0):
-            pygame.quit()
-            # ball_dy = .1
 
-        score += reward
-        if not bricks:
-            _, bricks, ball, ball_dx, ball_dy = initialize()
+        # if np.isclose(ball_dy, 0):
+            # ball_dy = .1
         
-        if ball.bottom > HEIGHT:
+        score += reward
+
+        if ball.bottom > HEIGHT or np.isclose(ball_dy, 0):
             pygame.quit()
             if not interactive:
                 agent.lost(Q_vals, state_array, actions)
             return score
-            # sys.exit()
         
+        if not bricks:
+            _, bricks, ball, ball_dx, ball_dy = initialize()
+
         if not interactive:
             agent.update(Q_vals, state_array, actions, reward, agent.shape(state))
         
@@ -130,10 +130,31 @@ if __name__ == "__main__":
         agent = Agent()
         scores = [0]*num_games
         moving_avgs = [0]*num_games
+        
         for i in range(num_games):
+            # Game loop
             score = launch_game(agent)
             scores[i] = score
-            j = min(i,10)
-            moving_avgs[i] = (moving_avgs[i-1]*j + score - (score[i-10] if i > 10 else 0))/j
-            
+            moving_avgs[i] = (moving_avgs[i-1]*min(i,10) + score - (score[i-10] if i > 10 else 0))/min(i+1,10)
+        
+        games = np.arange(num_games)
+
+        scores_exp = np.exp(scores)
+        print(scores)
+        print(scores_exp)
+        coeff = np.polyfit(games, scores_exp, 1)
+        lin_func = np.poly1d(coeff)
+        y_pred = lin_func(games)
+
+        plt.plot(scores, label='Score')
+        plt.plot(moving_avgs, label='Moving average')
+        plt.plot(np.log(y_pred), label='Score Regression')
+        # plt.plot(np.exp(np.log(agent.epsilon_decay)*np.arange(num_games)), label='Epsilon')
+        plt.title('DQN performance over time')
+        plt.xlabel('Game number')
+        plt.ylabel('Score')
+        plt.legend()
+        plt.show()
+        plt.savefig('score_plot.png')
+
         agent.save("brickbreaker_model")

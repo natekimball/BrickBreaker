@@ -6,11 +6,10 @@ class Agent:
     def __init__(self):
         # 50 bricks
         self.gamma = .9
-        self.input_shape = (53,4)
+        # self.input_shape = (53,4)
         self.actions = [[0,0], [1,0], [0,1]]
         self.model = tf.keras.Sequential([
-            tf.keras.layers.Flatten(input_shape=self.input_shape),
-            tf.keras.layers.Dense(128, activation='relu'),
+            tf.keras.layers.Dense(128, activation='relu', input_shape=(210,)),
             tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(len(self.actions), activation='linear')
         ])
@@ -21,20 +20,16 @@ class Agent:
     def get_action(self, state):
         Q_vals = self.Q(state)
         if np.random.random() < self.epsilon:
-            # return random.choice(self.actions)
             return Q_vals, self.actions[random.randint(0,len(self.actions)-1)]
-        i = np.argmax(Q_vals)
-        return Q_vals, self.actions[i]    
+        return Q_vals, self.actions[np.argmax(Q_vals)]    
 
     def update(self, Q_vals, state, action, reward, new_state):
-        self.epsilon *= self.epsilon_decay
         print("epsilon: ", self.epsilon)
-        # new_qs = self.Q(state)
+        self.epsilon *= self.epsilon_decay
         Q_vals[self.actions.index(action)] = reward + self.gamma * np.max(self.Q(new_state))
         self.model.fit(np.array([state]), np.array([Q_vals]))
         
     def lost(self, Q_vals, state, action):
-        # new_qs = self.Q(state)
         Q_vals[self.actions.index(action)] = -100
         self.model.fit(np.array([state]), np.array([Q_vals]))
     
@@ -43,12 +38,12 @@ class Agent:
     
     def shape(self, state):
         paddle, bricks, ball, ball_dx, ball_dy = state
-        data = np.zeros(self.input_shape)
-        data[0] = [paddle.left, paddle.right, paddle.top, paddle.bottom]
-        data[1] = [ball.left, ball.right, ball.top, ball.bottom]
-        data[2] = [ball_dx, ball_dy, 0, 0]
+        data = np.zeros(210)
+        data[0:4] = paddle.left, paddle.right, paddle.top, paddle.bottom
+        data[4:8] = ball.left, ball.right, ball.top, ball.bottom
+        data[8:10] = ball_dx, ball_dy
         for i, (brick, _) in enumerate(bricks):
-            data[i+3] = [brick.left, brick.right, brick.top, brick.bottom]
+            data[i+10:i+14] = brick.left, brick.right, brick.top, brick.bottom
         return data
     
     def save(self, path):
