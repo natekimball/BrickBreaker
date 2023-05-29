@@ -3,6 +3,8 @@ import sys
 import random
 import numpy as np
 from DQNagent import Agent
+import matplotlib.pyplot as plt
+import sys
 
 
 WIDTH, HEIGHT = 800, 600
@@ -19,6 +21,8 @@ PADDLE_WIDTH, PADDLE_HEIGHT = 80, 15
 BALL_WIDTH, BALL_HEIGHT = 15, 15
 BRICK_WIDTH, BRICK_HEIGHT = 75, 20
 
+interactive = '-i' in sys.argv or '--interactive' in sys.argv
+
 def launch_game(agent):
     pygame.init()
     win = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -31,17 +35,20 @@ def launch_game(agent):
                 pygame.quit()
                 sys.exit()
 
-        # keys = pygame.key.get_pressed()
-        # if keys[pygame.K_LEFT] and paddle.left > 0:
-        #     paddle.left -= 5
-        # if keys[pygame.K_RIGHT] and paddle.right < WIDTH:
-        #     paddle.right += 5
-        
-        actions = agent.get_action(state)
-        if actions[0] == 1 and paddle.left > 0:
-            paddle.left -= 5
-        if actions[1] == 1 and paddle.right < WIDTH:
-            paddle.right += 5
+        if interactive:
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT] and paddle.left > 0:
+                paddle.left -= 5
+            if keys[pygame.K_RIGHT] and paddle.right < WIDTH:
+                paddle.right += 5
+        else:
+            state_array = agent.shape(state)
+            Q_vals, actions = agent.get_action(state_array)
+            print(actions)
+            if actions[0] == 1 and paddle.left > 0:
+                paddle.left -= 5
+            if actions[1] == 1 and paddle.right < WIDTH:
+                paddle.right += 5
 
         ball.left += ball_dx
         ball.top += ball_dy
@@ -53,12 +60,13 @@ def launch_game(agent):
         if ball.top < 0:
             ball_dy *= -1
         if ball.colliderect(paddle) and ball_dy > 0:
+            reward += .5
             paddle_third = paddle.left + paddle.width // 3
             paddle_2nd_third = paddle.left + 2*paddle.width // 3
             d = np.array([ball_dx, ball_dy])
+            # formula for vector reflection: r = d - (2*d.n) * n
             if ball_center < paddle_third:
                 n = np.array([-.196, -.981])
-                
             elif ball_center > paddle_2nd_third:
                 n = np.array([.196, -.981])
             else:
@@ -85,13 +93,13 @@ def launch_game(agent):
         
         if ball.bottom > HEIGHT:
             pygame.quit()
-            agent.lost(state, actions)
+            if not interactive:
+                agent.lost(Q_vals, state_array, actions)
             return score
             # sys.exit()
-            
-        new_state = (paddle, bricks, ball, ball_dx, ball_dy)
         
-        agent.update(state, actions, reward, new_state)
+        if not interactive:
+            agent.update(Q_vals, state_array, actions, reward, agent.shape(state))
         
         redraw_window(win,state)
 
@@ -115,9 +123,17 @@ def redraw_window(win, state):
     pygame.time.delay(10)
     
 if __name__ == "__main__":
-    num_games = 1000000
-    agent = Agent()
-    scores = []
-    for i in range(num_games):
-        # Game loop
-        scores.append(launch_game(agent))
+    if interactive:
+        launch_game(None)
+    else:
+        num_games = 1000
+        agent = Agent()
+        scores = [0]*num_games
+        moving_avgs = [0]*num_games
+        for i in range(num_games):
+            score = launch_game(agent)
+            scores[i] = score
+            j = min(i,10)
+            moving_avgs[i] = (moving_avgs[i-1]*j + score - (score[i-10] if i > 10 else 0))/j
+            
+        agent.save("brickbreaker_model")
