@@ -10,7 +10,7 @@ class Agent:
         self.actions = [[0,0], [1,0], [0,1]]
         self.model = tf.keras.Sequential([
             tf.keras.layers.Dense(128, activation='relu', input_shape=(210,)),
-            tf.keras.layers.Dense(128, activation='relu'),
+            # tf.keras.layers.Dense(128, activation='relu'),
             tf.keras.layers.Dense(len(self.actions), activation='linear')
         ])
         self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -19,12 +19,13 @@ class Agent:
     
     def get_action(self, state):
         Q_vals = self.Q(state)
+        print("Q_vals =", Q_vals)
         if np.random.random() < self.epsilon:
             return Q_vals, self.actions[random.randint(0,len(self.actions)-1)]
         return Q_vals, self.actions[np.argmax(Q_vals)]    
 
     def update(self, Q_vals, state, action, reward, new_state):
-        print("epsilon: ", self.epsilon)
+        print("ε =", self.epsilon)
         self.epsilon *= self.epsilon_decay
         Q_vals[self.actions.index(action)] = reward + self.gamma * np.max(self.Q(new_state))
         self.model.fit(np.array([state]), np.array([Q_vals]))

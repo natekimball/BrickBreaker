@@ -4,7 +4,6 @@ import random
 import numpy as np
 from DQNagent import Agent
 import matplotlib.pyplot as plt
-import sys
 
 
 WIDTH, HEIGHT = 800, 600
@@ -37,18 +36,17 @@ def launch_game(agent):
 
         if interactive:
             keys = pygame.key.get_pressed()
-            if keys[pygame.K_LEFT] and paddle.left > 0:
-                paddle.left -= 5
-            if keys[pygame.K_RIGHT] and paddle.right < WIDTH:
-                paddle.right += 5
+            left, right = keys[pygame.K_LEFT], keys[pygame.K_RIGHT]
         else:
             state_array = agent.shape(state)
             Q_vals, actions = agent.get_action(state_array)
             print(actions)
-            if actions[0] == 1 and paddle.left > 0:
-                paddle.left -= 5
-            if actions[1] == 1 and paddle.right < WIDTH:
-                paddle.right += 5
+            left, right = actions
+    
+        if left and paddle.left > 0:
+            paddle.left -= 5
+        if right and paddle.right < WIDTH:
+            paddle.right += 5
 
         ball.left += ball_dx
         ball.top += ball_dy
@@ -130,13 +128,13 @@ if __name__ == "__main__":
         agent = Agent()
         scores = [0]*num_games
         moving_avgs = [0]*num_games
-        
         for i in range(num_games):
             # Game loop
             score = launch_game(agent)
+            print(f"game {i} - {score}")
             scores[i] = score
-            moving_avgs[i] = (moving_avgs[i-1]*min(i,10) + score - (score[i-10] if i > 10 else 0))/min(i+1,10)
-        
+            moving_avgs[i] = (moving_avgs[i-1]*min(i,10) + score - (scores[i-10] if i > 10 else 0))/min(i+1,10)
+
         games = np.arange(num_games)
 
         scores_exp = np.exp(scores)
