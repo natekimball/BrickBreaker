@@ -27,8 +27,8 @@ def launch_game(agent):
     win = pygame.display.set_mode((WIDTH, HEIGHT))
     state = initialize()
     paddle, bricks, ball, ball_dx, ball_dy = state
+    score = 0
     while True:
-        score = 0
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -57,8 +57,9 @@ def launch_game(agent):
             ball_dx *= -1
         if ball.top < 0:
             ball_dy *= -1
+        collision = 0
         if ball.colliderect(paddle) and ball_dy > 0:
-            reward += .5
+            collision = .5
             paddle_third = paddle.left + paddle.width // 3
             paddle_2nd_third = paddle.left + 2*paddle.width // 3
             d = np.array([ball_dx, ball_dy])
@@ -86,6 +87,7 @@ def launch_game(agent):
             # ball_dy = .1
         
         score += reward
+        reward += collision
 
         if ball.bottom > HEIGHT or np.isclose(ball_dy, 0):
             pygame.quit()
@@ -99,7 +101,7 @@ def launch_game(agent):
         if not interactive:
             agent.update(Q_vals, state_array, actions, reward, agent.shape(state))
         
-        redraw_window(win,state)
+        redraw_window(win,state, score)
 
 def initialize():
     paddle = pygame.Rect(WIDTH // 2, HEIGHT - PADDLE_HEIGHT - 10, PADDLE_WIDTH, PADDLE_HEIGHT)
@@ -109,7 +111,7 @@ def initialize():
            for i in range(5) for j in range(WIDTH // (BRICK_WIDTH + 5))]
     return paddle, bricks, ball, ball_dx, ball_dy
     
-def redraw_window(win, state):
+def redraw_window(win, state, score):
     paddle, bricks, ball, _, _ = state
     win.fill(BLACK)
     pygame.draw.rect(win, BLUE, paddle)
@@ -117,8 +119,18 @@ def redraw_window(win, state):
     for brick, color in bricks:
         pygame.draw.rect(win, color, brick)
 
+    # Create a font object.
+    font = pygame.font.Font(None, 36)
+
+    # Create a text surface object, score is converted to string.
+    text = font.render("Score: " + str(score), True, WHITE)
+
+    # Blit the text surface object to the display surface object at the corner.
+    win.blit(text, (10,10))
+
     pygame.display.flip()
     pygame.time.delay(10)
+
     
 if __name__ == "__main__":
     if interactive:
@@ -134,7 +146,7 @@ if __name__ == "__main__":
             print(f"game {i} - {score}")
             scores[i] = score
             moving_avgs[i] = (moving_avgs[i-1]*min(i,10) + score - (scores[i-10] if i > 10 else 0))/min(i+1,10)
-
+        
         games = np.arange(num_games)
 
         scores_exp = np.exp(scores)
