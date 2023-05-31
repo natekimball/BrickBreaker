@@ -1,21 +1,29 @@
 import tensorflow as tf
 import numpy as np
+from tensorflow.keras.optimizers import Adam
 import random
 
 class Agent:
-    def __init__(self):
+    def __init__(self, gamma=.9, epsilon_decay=.999, learning_rate=.001, model_dir=None):
         # 50 bricks
-        self.gamma = .9
-        # self.input_shape = (53,4)
+        self.gamma = gamma
         self.actions = [[0,0], [1,0], [0,1]]
-        self.model = tf.keras.Sequential([
-            tf.keras.layers.Dense(128, activation='relu', input_shape=(210,)),
-            # tf.keras.layers.Dense(128, activation='relu'),
-            tf.keras.layers.Dense(len(self.actions), activation='linear')
-        ])
-        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        if model_dir:
+            self.model = tf.keras.models.load_model(model_dir)
+        else:
+            self.model = tf.keras.Sequential([
+                tf.keras.layers.Dense(128, activation='relu', input_shape=(210,)),
+                tf.keras.layers.Dense(len(self.actions), activation='linear')
+            ])
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=learning_rate,
+            decay_steps=10,
+            decay_rate=.999,
+            staircase=True
+        )
+        self.model.compile(optimizer=Adam(learning_rate=lr_schedule), loss='mse')
         self.epsilon = 1
-        self.epsilon_decay = .9999
+        self.epsilon_decay = epsilon_decay
     
     def get_action(self, state):
         Q_vals = self.Q(state)
@@ -49,33 +57,3 @@ class Agent:
     
     def save(self, path):
         self.model.save(path)
-
-    # def get_action(self, state):
-    #     Q_vals = np.array([self.Q(state, action) for action in self.actions])
-    #     print(Q_vals)
-    #     print(Q_vals.shape)
-    #     i = np.argmax(Q_vals)
-    #     print(i)
-    #     return self.actions[i]
-    
-    # def update(self, state, action, reward, new_state):
-    #     new_q = reward + self.gamma * np.max([self.Q(new_state, action) for action in self.actions])
-    #     self.model.fit(self.shape(state, action), new_q)
-    
-    # def lost(self, state, action):
-    #     self.model.fit(self.shape(state, action), 0)
-    
-    # def Q(self, state, action):
-    #     data = np.array([self.shape(state, action)])
-    #     return np.squeeze(self.model.predict(data))
-    
-    # def shape(self, state, action):
-    #     paddle, bricks, ball, ball_dx, ball_dy = state
-    #     left, right = action
-    #     data = np.zeros(self.input_shape)
-    #     data[0] = [paddle.left, paddle.right, paddle.top, paddle.bottom]
-    #     data[1] = [ball.left, ball.right, ball.top, ball.bottom]
-    #     data[2] = [ball_dx, ball_dy, left, right]
-    #     for i, (brick, _) in enumerate(bricks):
-    #         data[i+3] = [brick.left, brick.right, brick.top, brick.bottom]
-    #     return data

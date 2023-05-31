@@ -29,6 +29,7 @@ def launch_game(agent):
     state = initialize()
     paddle, bricks, ball, ball_dx, ball_dy = state
     score = 0
+    i = 0
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -38,11 +39,13 @@ def launch_game(agent):
         if INTERACTIVE:
             keys = pygame.key.get_pressed()
             left, right = keys[pygame.K_LEFT], keys[pygame.K_RIGHT]
-        else:
+        elif i % SPEEDUP == 0:
             state_array = agent.shape(state)
             Q_vals, actions = agent.get_action(state_array)
             print(actions)
             left, right = actions
+        else:
+            left, right = False, False
 
         if left and paddle.left > 0:
             paddle.left -= 5 * SPEEDUP
@@ -60,7 +63,7 @@ def launch_game(agent):
             ball_dy *= -1
         collision = 0
         if ball.colliderect(paddle) and ball_dy > 0:
-            collision = .5
+            collision = 1
             paddle_third = paddle.left + paddle.width // 3
             paddle_2nd_third = paddle.left + 2*paddle.width // 3
             d = np.array([ball_dx, ball_dy])
@@ -99,15 +102,17 @@ def launch_game(agent):
         if not bricks:
             _, bricks, ball, ball_dx, ball_dy = initialize()
 
-        if not INTERACTIVE:
+        if not INTERACTIVE and i % SPEEDUP == 0:
             agent.update(Q_vals, state_array, actions, reward, agent.shape(state))
         
         redraw_window(win,state, score)
+        i+=1
 
 def initialize():
     paddle = pygame.Rect(WIDTH // 2, HEIGHT - PADDLE_HEIGHT - 10, PADDLE_WIDTH, PADDLE_HEIGHT)
     ball = pygame.Rect(random.randint(0,WIDTH - BALL_WIDTH), HEIGHT // 2, BALL_WIDTH, BALL_HEIGHT)
-    ball_dx, ball_dy = 3 * SPEEDUP, -3 * SPEEDUP
+    # ball_dx, ball_dy = 3 * SPEEDUP, -3 * SPEEDUP
+    ball_dx, ball_dy = 3, -3 # if INTERACTIVE else (6, -6)
     bricks = [(pygame.Rect(j * (BRICK_WIDTH + 5), i * (BRICK_HEIGHT + 5), BRICK_WIDTH, BRICK_HEIGHT), COLORS[i % len(COLORS)])
            for i in range(5) for j in range(WIDTH // (BRICK_WIDTH + 5))]
     return paddle, bricks, ball, ball_dx, ball_dy
@@ -120,25 +125,31 @@ def redraw_window(win, state, score):
     for brick, color in bricks:
         pygame.draw.rect(win, color, brick)
 
-    # Create a font object.
     font = pygame.font.Font(None, 36)
-
-    # Create a text surface object, score is converted to string.
     text = font.render("Score: " + str(score), True, WHITE)
-
-    # Blit the text surface object to the display surface object at the corner.
     win.blit(text, (10,10))
 
     pygame.display.flip()
     pygame.time.delay(10)
 
-    
+def get_arg(key, default):
+    if type(key) == list:
+        for k in key:
+            if k in sys.argv:
+                return sys.argv[sys.argv.index(k) + 1]
+    elif key in sys.argv:
+        return sys.argv[sys.argv.index(key) + 1]
+    return default
+
 if __name__ == "__main__":
     if INTERACTIVE:
         launch_game(None)
     else:
-        num_games = 1000
-        agent = Agent()
+        num_games = int(get_arg(['-n','--num-games'], 100))
+        gamma = float(get_arg(['-g','--gamma'], .9))
+        epsilon_decay = float(get_arg(['-e','--epsilon-decay'], .999)) # max(.999,1-1/(10*num_games))))
+        learning_rate=float(get_arg(['-l','--learning-rate'], .001))
+        agent = Agent(gamma, epsilon_decay)
         scores = [0]*num_games
         moving_avgs = [0]*num_games
         for i in range(num_games):
@@ -157,24 +168,19 @@ if __name__ == "__main__":
             # plt.legend()
             # plt.pause(0.01)
         
-        games = np.arange(num_games)
-
-        scores_exp = np.exp(scores)
-        print(scores)
-        print(scores_exp)
-        coeff = np.polyfit(games, scores_exp, 1)
+        games = np.arange(1,num_games+1)
+        coeff = np.polyfit(np.log(games), scores, 1)
         lin_func = np.poly1d(coeff)
-        y_pred = lin_func(games)
+        y_pred = lin_func(np.log(games))
 
-        plt.plot(scores, label='Score')
-        plt.plot(moving_avgs, label='Moving average')
-        plt.plot(np.log(y_pred), label='Score Regression')
-        # plt.plot(np.exp(np.log(agent.epsilon_decay)*np.arange(num_games)), label='Epsilon')
+        plt.plot(games, scores, label=f'Scores')
+        plt.plot(games, moving_avgs, label='Moving average')
+        plt.plot(games, y_pred, label=f'Score Regression, y = {coeff[0]:.2f}*ln(x) + {coeff[1]:.2f} (R^2 = {np.corrcoef(scores, y_pred)[0,1]**2:.3f})')
         plt.title('DQN performance over time')
         plt.xlabel('Game number')
         plt.ylabel('Score')
         plt.legend()
-        plt.show()
+        # plt.show()
         plt.savefig('score_plot.png')
 
         agent.save("brickbreaker_model")
