@@ -20,7 +20,8 @@ PADDLE_WIDTH, PADDLE_HEIGHT = 80, 15
 BALL_WIDTH, BALL_HEIGHT = 15, 15
 BRICK_WIDTH, BRICK_HEIGHT = 75, 20
 
-interactive = '-i' in sys.argv or '--interactive' in sys.argv
+INTERACTIVE = '-i' in sys.argv or '--interactive' in sys.argv
+SPEEDUP = 1 if INTERACTIVE else 3
 
 def launch_game(agent):
     pygame.init()
@@ -34,7 +35,7 @@ def launch_game(agent):
                 pygame.quit()
                 sys.exit()
 
-        if interactive:
+        if INTERACTIVE:
             keys = pygame.key.get_pressed()
             left, right = keys[pygame.K_LEFT], keys[pygame.K_RIGHT]
         else:
@@ -42,11 +43,11 @@ def launch_game(agent):
             Q_vals, actions = agent.get_action(state_array)
             print(actions)
             left, right = actions
-    
+
         if left and paddle.left > 0:
-            paddle.left -= 5
+            paddle.left -= 5 * SPEEDUP
         if right and paddle.right < WIDTH:
-            paddle.right += 5
+            paddle.right += 5 * SPEEDUP
 
         ball.left += ball_dx
         ball.top += ball_dy
@@ -91,14 +92,14 @@ def launch_game(agent):
 
         if ball.bottom > HEIGHT or np.isclose(ball_dy, 0):
             pygame.quit()
-            if not interactive:
+            if not INTERACTIVE:
                 agent.lost(Q_vals, state_array, actions)
             return score
         
         if not bricks:
             _, bricks, ball, ball_dx, ball_dy = initialize()
 
-        if not interactive:
+        if not INTERACTIVE:
             agent.update(Q_vals, state_array, actions, reward, agent.shape(state))
         
         redraw_window(win,state, score)
@@ -106,7 +107,7 @@ def launch_game(agent):
 def initialize():
     paddle = pygame.Rect(WIDTH // 2, HEIGHT - PADDLE_HEIGHT - 10, PADDLE_WIDTH, PADDLE_HEIGHT)
     ball = pygame.Rect(random.randint(0,WIDTH - BALL_WIDTH), HEIGHT // 2, BALL_WIDTH, BALL_HEIGHT)
-    ball_dx, ball_dy = 3, -3
+    ball_dx, ball_dy = 3 * SPEEDUP, -3 * SPEEDUP
     bricks = [(pygame.Rect(j * (BRICK_WIDTH + 5), i * (BRICK_HEIGHT + 5), BRICK_WIDTH, BRICK_HEIGHT), COLORS[i % len(COLORS)])
            for i in range(5) for j in range(WIDTH // (BRICK_WIDTH + 5))]
     return paddle, bricks, ball, ball_dx, ball_dy
@@ -133,7 +134,7 @@ def redraw_window(win, state, score):
 
     
 if __name__ == "__main__":
-    if interactive:
+    if INTERACTIVE:
         launch_game(None)
     else:
         num_games = 1000
@@ -146,6 +147,15 @@ if __name__ == "__main__":
             print(f"game {i} - {score}")
             scores[i] = score
             moving_avgs[i] = (moving_avgs[i-1]*min(i,10) + score - (scores[i-10] if i > 10 else 0))/min(i+1,10)
+
+            # plt.cla()
+            # plt.plot(scores[:i+1], label='Scores', color='blue')
+            # plt.plot(moving_avgs[:i+1], label='Moving average', color='red')
+            # plt.xlabel('Game #')
+            # plt.ylabel('Score')
+            # plt.xlim([0, num_games])  # Set the limit of x-axis here
+            # plt.legend()
+            # plt.pause(0.01)
         
         games = np.arange(num_games)
 
