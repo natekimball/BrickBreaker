@@ -42,6 +42,7 @@ def launch_game(agent):
         elif i % SPEEDUP == 0:
             state_array = agent.shape(state)
             Q_vals, actions = agent.get_action(state_array)
+            # actions = agent.get_action(state_array)
             print(actions)
             left, right = actions
         else:
@@ -96,14 +97,14 @@ def launch_game(agent):
         if ball.bottom > HEIGHT or np.isclose(ball_dy, 0):
             pygame.quit()
             if not INTERACTIVE:
-                agent.lost(Q_vals, state_array, actions)
+                agent.lost(state_array, actions, Q_vals)
             return score
         
         if not bricks:
             _, bricks, ball, ball_dx, ball_dy = initialize()
 
         if not INTERACTIVE and i % SPEEDUP == 0:
-            agent.update(Q_vals, state_array, actions, reward, agent.shape(state))
+            agent.update(state_array, actions, reward, agent.shape(state), Q_vals)
         
         redraw_window(win,state, score)
         i+=1
@@ -112,7 +113,7 @@ def initialize():
     paddle = pygame.Rect(WIDTH // 2, HEIGHT - PADDLE_HEIGHT - 10, PADDLE_WIDTH, PADDLE_HEIGHT)
     ball = pygame.Rect(random.randint(0,WIDTH - BALL_WIDTH), HEIGHT // 2, BALL_WIDTH, BALL_HEIGHT)
     # ball_dx, ball_dy = 3 * SPEEDUP, -3 * SPEEDUP
-    ball_dx, ball_dy = 3, -3 # if INTERACTIVE else (6, -6)
+    ball_dx, ball_dy = 3, -3
     bricks = [(pygame.Rect(j * (BRICK_WIDTH + 5), i * (BRICK_HEIGHT + 5), BRICK_WIDTH, BRICK_HEIGHT), COLORS[i % len(COLORS)])
            for i in range(5) for j in range(WIDTH // (BRICK_WIDTH + 5))]
     return paddle, bricks, ball, ball_dx, ball_dy
@@ -149,7 +150,11 @@ if __name__ == "__main__":
         gamma = float(get_arg(['-g','--gamma'], .9))
         epsilon_decay = float(get_arg(['-e','--epsilon-decay'], .999)) # max(.999,1-1/(10*num_games))))
         learning_rate=float(get_arg(['-l','--learning-rate'], .001))
-        agent = Agent(gamma, epsilon_decay)
+        replay = '--no-replay' not in sys.argv
+        batch_size = int(get_arg(['-b','--batch-size'], 32))
+        memory_size = int(get_arg(['-m','--memory'], 1024))
+        
+        agent = Agent(gamma, epsilon_decay,learning_rate, replay=replay, batch_size=batch_size, memory_size=memory_size)
         scores = [0]*num_games
         moving_avgs = [0]*num_games
         for i in range(num_games):
