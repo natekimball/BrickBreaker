@@ -23,13 +23,14 @@ BRICK_WIDTH, BRICK_HEIGHT = 75, 20
 INTERACTIVE = '-i' in sys.argv or '--interactive' in sys.argv
 SPEEDUP = 1 if INTERACTIVE else 3
 
-def launch_game(agent):
+def launch_game(agent, i=None):
     pygame.init()
     win = pygame.display.set_mode((WIDTH, HEIGHT))
     state = initialize()
     paddle, bricks, ball, ball_dx, ball_dy = state
     score = 0
     i = 0
+    last_collision = 0
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -43,10 +44,10 @@ def launch_game(agent):
             state_array = agent.shape(state)
             Q_vals, actions = agent.get_action(state_array)
             # actions = agent.get_action(state_array)
-            print(actions)
             left, right = actions
         else:
             left, right = False, False
+            
 
         if left and paddle.left > 0:
             paddle.left -= 5 * SPEEDUP
@@ -64,6 +65,7 @@ def launch_game(agent):
             ball_dy *= -1
         collision = 0
         if ball.colliderect(paddle) and ball_dy > 0:
+            last_collision = i
             collision = 1
             paddle_third = paddle.left + paddle.width // 3
             paddle_2nd_third = paddle.left + 2*paddle.width // 3
@@ -80,6 +82,7 @@ def launch_game(agent):
         else:
             for brick,c in bricks:
                 if ball.colliderect(brick):
+                    last_collision = i
                     if ball_center < brick.left or ball_center > brick.right:
                         ball_dx *= -1
                     else:
@@ -88,13 +91,13 @@ def launch_game(agent):
                     bricks.remove((brick,c))
                     break
 
-        # if np.isclose(ball_dy, 0):
-            # ball_dy = .1
+        if np.isclose(ball_dy, 0):
+            ball_dy = .1
         
         score += reward
         reward += collision
 
-        if ball.bottom > HEIGHT or np.isclose(ball_dy, 0):
+        if ball.bottom > HEIGHT or i - last_collision > 600 or np.isclose(ball_dy, 0):
             pygame.quit()
             if not INTERACTIVE:
                 agent.lost(state_array, actions, Q_vals)
@@ -106,7 +109,7 @@ def launch_game(agent):
         if not INTERACTIVE and i % SPEEDUP == 0:
             agent.update(state_array, actions, reward, agent.shape(state), Q_vals)
         
-        redraw_window(win,state, score)
+        redraw_window(win,state, score, i)
         i+=1
 
 def initialize():
@@ -118,7 +121,7 @@ def initialize():
            for i in range(5) for j in range(WIDTH // (BRICK_WIDTH + 5))]
     return paddle, bricks, ball, ball_dx, ball_dy
     
-def redraw_window(win, state, score):
+def redraw_window(win, state, score, game_num=None):
     paddle, bricks, ball, _, _ = state
     win.fill(BLACK)
     pygame.draw.rect(win, BLUE, paddle)
@@ -129,6 +132,11 @@ def redraw_window(win, state, score):
     font = pygame.font.Font(None, 36)
     text = font.render("Score: " + str(score), True, WHITE)
     win.blit(text, (10,10))
+    
+    if game_num is not None:
+        font = pygame.font.Font(None, 36)
+        text = font.render("Game: " + str(game_num), True, WHITE)
+        win.blit(text, (WIDTH-100,10))
 
     pygame.display.flip()
     pygame.time.delay(10)
@@ -159,7 +167,7 @@ if __name__ == "__main__":
         moving_avgs = [0]*num_games
         for i in range(num_games):
             # Game loop
-            score = launch_game(agent)
+            score = launch_game(agent, i)
             print(f"game {i} - {score}")
             scores[i] = score
             moving_avgs[i] = (moving_avgs[i-1]*min(i,10) + score - (scores[i-10] if i > 10 else 0))/min(i+1,10)
@@ -188,4 +196,4 @@ if __name__ == "__main__":
         # plt.show()
         plt.savefig('score_plot.png')
 
-        agent.save("brickbreaker_model")
+        agent.save("brickbreaker_model.pt")
