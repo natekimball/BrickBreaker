@@ -8,8 +8,8 @@ import random
 class QNetwork(nn.Module):
     def __init__(self):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(210, 128)
-        self.fc2 = nn.Linear(128, 3)
+        self.fc1 = nn.Linear(210, 18)
+        self.fc2 = nn.Linear(18, 3)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
@@ -65,8 +65,7 @@ class Agent:
         self.optimizer.step()
 
     def update(self, state, action, reward, new_state, Q_vals):
-        print("ε =", self.epsilon)
-        if np.isclose(self.epsilon,0):
+        if self.epsilon < .005:
             self.epsilon = 0
         else:
             self.epsilon *= self.epsilon_decay
@@ -77,11 +76,12 @@ class Agent:
             new_Q = reward
             if new_state is not None:
                 new_Q += self.gamma * max(self.Q(new_state))
-            Q_vals = self.Q(state).detach().numpy()
+            Q_vals = self.Q(state)
             new_Q_vals = copy.deepcopy(Q_vals)
+            # fix
             new_Q_vals[self.actions.index(action)] = new_Q
             self.optimizer.zero_grad()
-            loss = self.criterion(Q_vals, new_Q_vals)
+            loss = self.criterion(torch.tensor(Q_vals,dtype=torch.float32), torch.tensor(new_Q_vals,dtype=torch.float32))
             loss.backward()
             self.optimizer.step()
     
@@ -102,5 +102,4 @@ class Agent:
         return data
 
     def save(self, path):
-        with open(path, 'w') as f:
-            torch.save(self.model.state_dict(), path)
+        torch.save(self.model, path)

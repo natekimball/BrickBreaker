@@ -23,7 +23,7 @@ BRICK_WIDTH, BRICK_HEIGHT = 75, 20
 INTERACTIVE = '-i' in sys.argv or '--interactive' in sys.argv
 SPEEDUP = 1 if INTERACTIVE else 3
 
-def launch_game(agent, i=None):
+def launch_game(agent, id=None):
     pygame.init()
     win = pygame.display.set_mode((WIDTH, HEIGHT))
     state = initialize()
@@ -109,19 +109,20 @@ def launch_game(agent, i=None):
         if not INTERACTIVE and i % SPEEDUP == 0:
             agent.update(state_array, actions, reward, agent.shape(state), Q_vals)
         
-        redraw_window(win,state, score, i)
+        redraw_window(win,state, score, id, agent.epsilon if agent is not None else None)
         i+=1
 
 def initialize():
     paddle = pygame.Rect(WIDTH // 2, HEIGHT - PADDLE_HEIGHT - 10, PADDLE_WIDTH, PADDLE_HEIGHT)
     ball = pygame.Rect(random.randint(0,WIDTH - BALL_WIDTH), HEIGHT // 2, BALL_WIDTH, BALL_HEIGHT)
     # ball_dx, ball_dy = 3 * SPEEDUP, -3 * SPEEDUP
-    ball_dx, ball_dy = 3, -3
+    ball_dx = 3 if random.randint(0,1) else -3
+    ball_dy = -3
     bricks = [(pygame.Rect(j * (BRICK_WIDTH + 5), i * (BRICK_HEIGHT + 5), BRICK_WIDTH, BRICK_HEIGHT), COLORS[i % len(COLORS)])
            for i in range(5) for j in range(WIDTH // (BRICK_WIDTH + 5))]
     return paddle, bricks, ball, ball_dx, ball_dy
     
-def redraw_window(win, state, score, game_num=None):
+def redraw_window(win, state, score, game_num=None, epsilon=None):
     paddle, bricks, ball, _, _ = state
     win.fill(BLACK)
     pygame.draw.rect(win, BLUE, paddle)
@@ -134,9 +135,14 @@ def redraw_window(win, state, score, game_num=None):
     win.blit(text, (10,10))
     
     if game_num is not None:
-        font = pygame.font.Font(None, 36)
+        font = pygame.font.Font(None, 24)
         text = font.render("Game: " + str(game_num), True, WHITE)
-        win.blit(text, (WIDTH-100,10))
+        win.blit(text, (WIDTH-100,HEIGHT-30))
+    
+    if epsilon is not None:
+        font = pygame.font.Font(None, 24)
+        text = font.render(f"ε = {epsilon:.3f}", True, WHITE)
+        win.blit(text, (10,HEIGHT-30))
 
     pygame.display.flip()
     pygame.time.delay(10)
@@ -156,17 +162,19 @@ if __name__ == "__main__":
     else:
         num_games = int(get_arg(['-n','--num-games'], 100))
         gamma = float(get_arg(['-g','--gamma'], .9))
-        epsilon_decay = float(get_arg(['-e','--epsilon-decay'], .999)) # max(.999,1-1/(10*num_games))))
+        epsilon_decay = float(get_arg(['-d','--epsilon-decay'], .999)) # max(.999,1-1/(10*num_games))))
         learning_rate=float(get_arg(['-l','--learning-rate'], .001))
         replay = '--no-replay' not in sys.argv
         batch_size = int(get_arg(['-b','--batch-size'], 32))
         memory_size = int(get_arg(['-m','--memory'], 1024))
+        model_dir = get_arg(['-f','--model-file'], None)
+        save_dir = get_arg(['-s','--save-dir'], "brickbreaker_model.pt")
         
-        agent = Agent(gamma, epsilon_decay,learning_rate, replay=replay, batch_size=batch_size, memory_size=memory_size)
+        agent = Agent(gamma, epsilon_decay,learning_rate, model_dir=model_dir, replay=replay, batch_size=batch_size, memory_size=memory_size)
         scores = [0]*num_games
         moving_avgs = [0]*num_games
         for i in range(num_games):
-            # Game loop
+            # Game loop 
             score = launch_game(agent, i)
             print(f"game {i} - {score}")
             scores[i] = score
@@ -196,4 +204,4 @@ if __name__ == "__main__":
         # plt.show()
         plt.savefig('score_plot.png')
 
-        agent.save("brickbreaker_model.pt")
+        agent.save(save_dir)
